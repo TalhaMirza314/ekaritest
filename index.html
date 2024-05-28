@@ -1,23 +1,101 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <meta charset="utf-8">
-  <title>AR Image Gallery</title>
-  <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@ar-js-org/ar.js@2.1.0/aframe/build/aframe-ar.min.js"></script>
-  <script src="app.js"></script>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <a-scene embedded arjs='sourceType: webcam;'>
-    <a-assets>
-      <!-- List your images here -->
-      <img id="image1" src="image1.jpg">
-      <img id="image2" src="image1.jpg">
-    </a-assets>
-    <a-marker-camera preset='hiro'></a-marker-camera>
-    <a-entity id="image-container"></a-entity>
-  </a-scene>
-  <div id="gallery"></div>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <title>AR Plane Tracking</title>
+    <style>
+      body {
+        margin: 0;
+        background-color: #f0f0f0;
+        font-family: Arial, sans-serif;
+      }
+      #camera-view {
+        width: 100%;
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      #ar-view {
+        width: 100%;
+        height: 100vh;
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="camera-view">
+      <video id="video" width="640" height="480" autoplay playsinline></video>
+    </div>
+    <div id="ar-view"></div>
+
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ar.js@2.1.1/dist/ar.js"></script>
+    <script>
+      let video = document.getElementById("video");
+      let arView = document.getElementById("ar-view");
+
+      // Set up the camera
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+        .then(stream => {
+          video.srcObject = stream;
+          video.play();
+        })
+        .catch(error => {
+          console.error("Error accessing camera:", error);
+        });
+
+      // Set up the AR scene
+      let scene = new THREE.Scene();
+      let camera = new THREE.Camera();
+      let renderer = new THREE.WebGLRenderer({
+        canvas: arView,
+        antialias: true
+      });
+
+      // Create a plane detector
+      let planeDetector = new AR.PlaneDetector({
+        video: video,
+        camera: camera,
+        scene: scene,
+        renderer: renderer,
+        debug: true
+      });
+
+      // Load the JPG image
+      let image = new THREE.TextureLoader().load("image1.jpg");
+
+      // Create a mesh to display the image
+      let mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: image }));
+
+      // Add the mesh to the scene
+      scene.add(mesh);
+
+      // Update the AR scene
+      function update() {
+        requestAnimationFrame(update);
+
+        // Update the plane detector
+        planeDetector.update();
+
+        // Get the detected plane
+        let plane = planeDetector.getPlane();
+
+        // If a plane is detected, update the mesh position and scale
+        if (plane) {
+          mesh.position.copy(plane.position);
+          mesh.rotation.copy(plane.rotation);
+          mesh.scale.set(plane.scale.x, plane.scale.y, 1);
+        }
+
+        // Render the scene
+        renderer.render(scene, camera);
+      }
+
+      update();
+    </script>
+  </body>
 </html>
