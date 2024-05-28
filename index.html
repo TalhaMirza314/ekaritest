@@ -2,100 +2,87 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <title>AR Plane Tracking</title>
+    <title>AR Image Augmentation</title>
     <style>
       body {
         margin: 0;
         background-color: #f0f0f0;
         font-family: Arial, sans-serif;
       }
-      #camera-view {
-        width: 100%;
-        height: 100vh;
-        display: flex;
-        justify-content: center;
-        align-items: center;
+      #video {
+        width: 640px;
+        height: 480px;
+        border: 1px solid black;
       }
-      #ar-view {
-        width: 100%;
-        height: 100vh;
-        position: absolute;
-        top: 0;
-        left: 0;
-        z-index: 1;
+      #outputCanvas {
+        width: 640px;
+        height: 480px;
+        border: 1px solid black;
       }
     </style>
   </head>
   <body>
-    <div id="camera-view">
-      <video id="video" width="640" height="480" autoplay playsinline></video>
-    </div>
-    <div id="ar-view"></div>
+    <video id="video" width="640" height="480" autoplay playsinline></video>
+    <canvas id="outputCanvas" width="640" height="480"></canvas>
 
-    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@ar-js-org/sdk@2.1.1/dist/ar-web-sdk.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1277555222/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@0.3.1277555222/selfie_segmentation.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsartoolkit5@5.4.1/dist/jsartoolkit5.js"></script>
+
     <script>
-      let video = document.getElementById("video");
-      let arView = document.getElementById("ar-view");
-
-      // Set up the camera
+      // Initialize the camera
       navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
         .then(stream => {
+          const video = document.getElementById("video");
           video.srcObject = stream;
           video.play();
+
+          // Initialize the ARToolKit detector
+          const detector = new jsartoolkit5.Detector(video);
+
+          // Initialize the marker
+          const marker = new jsartoolkit5.Marker("pattern1");
+
+          // Load the augmented image
+          const image = new Image();
+          image.src = "image1.jpg";
+          image.onload = () => {
+            // Start the AR loop
+            requestAnimationFrame(loop);
+          };
         })
         .catch(error => {
           console.error("Error accessing camera:", error);
         });
 
-      // Set up the AR scene
-      let scene = new THREE.Scene();
-      let camera = new THREE.Camera();
-      let renderer = new THREE.WebGLRenderer({
-        canvas: arView,
-        antialias: true
-      });
+      // AR loop
+      function loop() {
+        requestAnimationFrame(loop);
 
-      // Create a plane detector
-      let planeDetector = new AR.PlaneDetector({
-        video: video,
-        camera: camera,
-        scene: scene,
-        renderer: renderer,
-        debug: true
-      });
+        // Detect the marker in the current frame
+        const pose = detector.detect(video, marker);
 
-      // Load the JPG image
-      let image = new THREE.TextureLoader().load("image.jpg");
+        // If the marker is detected, augment the image onto the marker
+        if (pose) {
+          const canvas = document.getElementById("outputCanvas");
+          const ctx = canvas.getContext("2d");
 
-      // Create a mesh to display the image
-      let mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: image }));
+          // Clear the canvas
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Add the mesh to the scene
-      scene.add(mesh);
+          // Draw the video frame onto the canvas
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      // Update the AR scene
-      function update() {
-        requestAnimationFrame(update);
+          // Calculate the position and size of the augmented image
+          const x = pose.x * canvas.width;
+          const y = pose.y * canvas.height;
+          const width = 200;
+          const height = 200;
 
-        // Update the plane detector
-        planeDetector.update();
-
-        // Get the detected plane
-        let plane = planeDetector.getPlane();
-
-        // If a plane is detected, update the mesh position and scale
-        if (plane) {
-          mesh.position.copy(plane.position);
-          mesh.rotation.copy(plane.rotation);
-          mesh.scale.set(plane.scale.x, plane.scale.y, 1);
+          // Draw the augmented image onto the canvas
+          ctx.drawImage(image, x, y, width, height);
         }
-
-        // Render the scene
-        renderer.render(scene, camera);
       }
-
-      update();
     </script>
   </body>
 </html>
